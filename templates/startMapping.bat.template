@@ -1,0 +1,34 @@
+@echo off
+setlocal enabledelayedexpansion
+
+echo Detecting available network interfaces...
+echo.
+
+:: 获取网络接口信息
+for /f "tokens=1,2 delims=:" %%a in ('ipconfig ^| findstr /C:"IPv4"') do (
+    set "ip_line=%%b"
+    set "ip_line=!ip_line: =!"
+    if not "!ip_line!"=="127.0.0.1" (
+        echo Available IP: !ip_line!
+    )
+)
+
+echo.
+echo Starting U2R Client...
+echo Note: Direct connection - UDPSpeeder -> U2R -> Remote Server
+echo.
+
+echo Starting U2R Client (127.0.0.1:{{UDP2RAW_PORT}} -> {{REMOTE_HOST}}:{{UDP2RAW_PORT}})...
+start "U2R Client" "%~dp0udp2raw_mp.exe" -c -l 127.0.0.1:{{UDP2RAW_PORT}} -r {{REMOTE_HOST}}:{{UDP2RAW_PORT}} --raw-mode easyfaketcp -k "{{PASSWORD}}" {{UDP2RAW_EXTRA}}
+
+timeout /t 3 /nobreak >nul
+
+echo Starting UDPSpeeder...
+start "UDPSpeeder Client" "%~dp0speederv2.exe" -c -l 0.0.0.0:51820 -r 127.0.0.1:{{UDP2RAW_PORT}} -k {{PASSWORD}} -f{{FEC_CONFIG}} --mode {{MODE}} --timeout {{TIMEOUT}} -q {{QUEUE}} -i {{INTERVAL}}
+
+echo Services started in configuration with U2R!
+echo Architecture: WireGuard(51820) -> UDPSpeeder -> U2R Client -> U2R Server -> UDPSpeeder Server
+echo UDPSpeeder listening on: 0.0.0.0:51820 (WireGuard port)
+echo UDPSpeeder forwarding to local U2R: 127.0.0.1:{{UDP2RAW_PORT}}
+echo U2R Client: 127.0.0.1:{{UDP2RAW_PORT}} -> {{REMOTE_HOST}}:{{UDP2RAW_PORT}} (easy-faketcp)
+pause

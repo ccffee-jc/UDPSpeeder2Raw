@@ -1,0 +1,28 @@
+@echo off
+setlocal enabledelayedexpansion
+
+echo Detecting available network interfaces...
+echo.
+
+:: 获取网络接口信息
+for /f "tokens=1,2 delims=:" %%a in ('ipconfig ^| findstr /C:"IPv4"') do (
+    set "ip_line=%%b"
+    set "ip_line=!ip_line: =!"
+    if not "!ip_line!"=="127.0.0.1" (
+        echo Available IP: !ip_line!
+    )
+)
+
+echo.
+echo Starting UDPSpeeder in direct mode...
+echo Note: Direct connection - UDPSpeeder -> Remote Server
+echo.
+
+echo Starting UDPSpeeder...
+start "UDPSpeeder Client" "%~dp0speederv2.exe" -c -l 0.0.0.0:51820 -r {{REMOTE_HOST}}:{{SPEEDER_PORT}} -k {{PASSWORD}} -f{{FEC_CONFIG}} --mode {{MODE}} --timeout {{TIMEOUT}} -q {{QUEUE}} -i {{INTERVAL}}
+
+echo Services started in direct configuration!
+echo Architecture: WireGuard(51820) -> UDPSpeeder -> Remote Server (Direct)
+echo UDPSpeeder listening on: 0.0.0.0:51820 (WireGuard port)
+echo UDPSpeeder forwarding directly to: {{REMOTE_HOST}}:{{SPEEDER_PORT}}
+pause

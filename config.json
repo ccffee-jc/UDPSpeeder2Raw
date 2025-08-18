@@ -1,0 +1,41 @@
+{
+  "global": {
+    "remote_host": "1.2.3.4",
+    "password": "password123"
+  },
+  "groups": [
+    {
+      "name": "台式电脑",
+      "speeder_port": 10001,
+      "udp2raw_port": 10002,
+      "fec_config": "1:1,2:1,10:3,20:5",
+      "mode": 0,
+      "timeout": 4,
+      "queue": 20,
+      "interval": 5,
+      "udp2raw_extra": "--fix-gro"
+    },
+    {
+      "name": "车上笔记本",
+      "speeder_port": 10011,
+      "udp2raw_port": 10012,
+      "fec_config": "1:1,2:2,3:2,4:2,8:4,10:5,14:7,18:9,20:10",
+      "mode": 0,
+      "timeout": 8,
+      "queue": 20,
+      "interval": 10,
+      "udp2raw_extra": "--fix-gro"
+    },
+    {
+      "name": "待启用1",
+      "speeder_port": 10021,
+      "udp2raw_port": 10022,
+      "fec_config": "1:1,2:1,10:6,20:10",
+      "mode": 0,
+      "timeout": 8,
+      "queue": 50,
+      "interval": 10,
+      "udp2raw_extra": "--fix-gro"
+    }
+  ]
+}
