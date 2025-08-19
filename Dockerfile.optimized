@@ -1,0 +1,160 @@
+# 优化的多架构Dockerfile
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETARCH
+ARG TARGETOS
+
+FROM --platform=$BUILDPLATFORM node:18-alpine AS builder
+
+# 安装构建依赖
+RUN apk add --no-cache \
+    bash \
+    jq
+
+WORKDIR /app
+
+# 复制并安装Node.js依赖
+COPY src/package.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# 二进制文件下载阶段
+FROM --platform=$BUILDPLATFORM alpine:latest AS downloader
+
+ARG TARGETARCH
+ARG TARGETOS
+
+# 安装下载工具
+RUN apk add --no-cache curl wget ca-certificates bash
+
+WORKDIR /downloads
+
+# 复制下载脚本
+COPY download-binaries.sh ./
+
+# 下载对应架构的二进制文件
+RUN set -ex; \
+    chmod +x download-binaries.sh; \
+    \
+    # 架构映射
+    case "${TARGETARCH}" in \
+        amd64) DOWNLOAD_ARCH="amd64" ;; \
+        arm64) DOWNLOAD_ARCH="arm64" ;; \
+        arm) DOWNLOAD_ARCH="arm" ;; \
+        *) DOWNLOAD_ARCH="amd64" ;; \
+    esac; \
+    \
+    echo "Downloading binaries for architecture: ${DOWNLOAD_ARCH}"; \
+    ./download-binaries.sh "${DOWNLOAD_ARCH}" true || { \
+        echo "Download failed, creating placeholder files"; \
+        touch speederv2_${DOWNLOAD_ARCH} udp2raw_${DOWNLOAD_ARCH}; \
+        chmod +x speederv2_${DOWNLOAD_ARCH} udp2raw_${DOWNLOAD_ARCH}; \
+    }; \
+    \
+    # 创建通用文件名的符号链接
+    ln -sf speederv2_${DOWNLOAD_ARCH} speederv2 || cp speederv2_${DOWNLOAD_ARCH} speederv2; \
+    ln -sf udp2raw_${DOWNLOAD_ARCH} udp2raw || cp udp2raw_${DOWNLOAD_ARCH} udp2raw; \
+    \
+    ls -la speederv2* udp2raw*
+
+# 运行时镜像
+FROM node:18-alpine
+
+# 安装系统依赖
+RUN apk add --no-cache \
+    bash \
+    jq \
+    zip \
+    p7zip \
+    curl \
+    wget \
+    lsof \
+    procps \
+    iproute2 \
+    iptables \
+    ca-certificates \
+    tzdata
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+# 创建应用目录
+WORKDIR /app
+
+# 从构建阶段复制node_modules
+COPY --from=builder /app/node_modules ./node_modules
+
+# 复制应用源码
+COPY src/ ./
+
+# 复制UDPSpeeder2Raw相关文件
+COPY config.json ./
+COPY *.sh ./
+COPY client/ ./client/
+COPY templates/ ./templates/
+
+# 从下载阶段复制二进制文件
+COPY --from=downloader /downloads/speederv2 ./speederv2
+COPY --from=downloader /downloads/udp2raw ./udp2raw
+
+# 备用方案：复制本地二进制文件作为fallback
+COPY speederv2_amd64 ./speederv2_fallback || echo "No local speederv2_amd64 found"
+COPY udp2raw_amd64 ./udp2raw_fallback || echo "No local udp2raw_amd64 found"
+
+# 设置文件权限并验证二进制文件
+RUN set -ex; \
+    chmod +x *.sh; \
+    \
+    # 检查并处理二进制文件
+    if [ ! -f speederv2 ] || [ ! -s speederv2 ] || ! file speederv2 | grep -q "ELF"; then \
+        echo "⚠️ Downloaded speederv2 is invalid, using fallback"; \
+        if [ -f speederv2_fallback ]; then \
+            cp speederv2_fallback speederv2; \
+        else \
+            echo "❌ No speederv2 fallback available"; \
+            exit 1; \
+        fi; \
+    fi; \
+    \
+    if [ ! -f udp2raw ] || [ ! -s udp2raw ] || ! file udp2raw | grep -q "ELF"; then \
+        echo "⚠️ Downloaded udp2raw is invalid, using fallback"; \
+        if [ -f udp2raw_fallback ]; then \
+            cp udp2raw_fallback udp2raw; \
+        else \
+            echo "❌ No udp2raw fallback available"; \
+            exit 1; \
+        fi; \
+    fi; \
+    \
+    chmod +x speederv2 udp2raw; \
+    rm -f speederv2_fallback udp2raw_fallback 2>/dev/null || true; \
+    \
+    # 验证二进制文件
+    echo "✅ Binary verification:"; \
+    file speederv2 udp2raw; \
+    ls -la speederv2 udp2raw; \
+    \
+    # 设置客户端文件权限
+    find client/ -name "*.exe" -exec chmod +x {} \; 2>/dev/null || true
+
+# 创建必要的目录
+RUN mkdir -p logs client_out
+
+# 创建非root用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001 -G nodejs
+
+# 设置目录权限
+RUN chown -R nextjs:nodejs /app
+
+# 切换到非root用户
+USER nextjs
+
+# 暴露端口
+EXPOSE 3000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3000/ || exit 1
+
+# 启动应用
+CMD ["node", "server.js"]

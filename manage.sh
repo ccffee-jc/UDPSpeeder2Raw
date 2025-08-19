@@ -12,17 +12,21 @@ show_usage() {
     echo "用法: $0 [命令]"
     echo ""
     echo "可用命令:"
-    echo "  start     启动服务"
-    echo "  stop      停止服务"
-    echo "  restart   重启服务"
-    echo "  status    查看服务状态"
-    echo "  logs      查看服务日志"
-    echo "  update    更新并重启服务"
-    echo "  build     重新构建镜像"
+    echo "  start       启动服务"
+    echo "  stop        停止服务"
+    echo "  restart     重启服务"
+    echo "  status      查看服务状态"
+    echo "  logs        查看服务日志"
+    echo "  update      更新并重启服务"
+    echo "  build       重新构建镜像"
+    echo "  prepare     预下载多架构二进制文件"
+    echo "  download    下载指定架构的二进制文件"
     echo ""
     echo "示例:"
-    echo "  $0 start    # 启动服务"
-    echo "  $0 logs     # 查看日志"
+    echo "  $0 start              # 启动服务"
+    echo "  $0 logs               # 查看日志"
+    echo "  $0 prepare            # 预下载所有架构的二进制文件"
+    echo "  $0 download arm64     # 下载arm64架构的二进制文件"
     echo ""
 }
 
@@ -142,9 +146,31 @@ build_service() {
     
     if [ $? -eq 0 ]; then
         echo "✅ 镜像构建完成"
-        echo "运行 '$0 start' 启动服务"
     else
         echo "❌ 镜像构建失败"
+        exit 1
+    fi
+}
+
+prepare_binaries() {
+    echo "正在预下载多架构二进制文件..."
+    
+    if [ -f "$SCRIPT_DIR/prepare-binaries.sh" ]; then
+        "$SCRIPT_DIR/prepare-binaries.sh"
+    else
+        echo "❌ prepare-binaries.sh 脚本不存在"
+        exit 1
+    fi
+}
+
+download_binaries() {
+    local arch=${1:-$(uname -m)}
+    echo "正在下载 $arch 架构的二进制文件..."
+    
+    if [ -f "$SCRIPT_DIR/download-binaries.sh" ]; then
+        "$SCRIPT_DIR/download-binaries.sh" "$arch"
+    else
+        echo "❌ download-binaries.sh 脚本不存在"
         exit 1
     fi
 }
@@ -177,6 +203,12 @@ main() {
             ;;
         build)
             build_service
+            ;;
+        prepare)
+            prepare_binaries
+            ;;
+        download)
+            download_binaries "${2:-}"
             ;;
         *)
             show_usage

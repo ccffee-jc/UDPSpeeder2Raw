@@ -22,6 +22,29 @@
 
 ### 部署步骤
 
+#### 方式一：使用预构建的Docker镜像（推荐）
+
+1. **下载配置文件模板**
+   ```bash
+   # 下载docker-compose配置
+   wget https://raw.githubusercontent.com/ccffee-jc/UDPSpeeder2Raw/master/docker-compose.ghcr.yml
+   
+   # 下载示例配置文件
+   wget https://raw.githubusercontent.com/ccffee-jc/UDPSpeeder2Raw/master/config.json
+   ```
+
+2. **创建必要目录**
+   ```bash
+   mkdir -p logs client_out
+   ```
+
+3. **启动服务**
+   ```bash
+   docker-compose -f docker-compose.ghcr.yml up -d
+   ```
+
+#### 方式二：从源码构建
+
 1. **克隆或下载项目文件**
 
 2. **确保所有必要文件存在**
@@ -199,6 +222,93 @@ docker-compose exec udpspeeder2raw-web cat /app/logs/mapping_server.log
 # 进入容器调试
 docker-compose exec udpspeeder2raw-web sh
 ```
+
+## Docker镜像
+
+### 官方镜像仓库
+
+项目提供了预构建的Docker镜像，托管在GitHub Container Registry：
+
+- **镜像地址**: `ghcr.io/ccffee-jc/udpspeeder2raw`
+- **支持架构**: linux/amd64, linux/arm64
+- **标签**:
+  - `latest`: 最新稳定版本
+  - `v1.0.0`: 特定版本标签
+
+### 使用预构建镜像
+
+```bash
+# 拉取最新镜像
+docker pull ghcr.io/ccffee-jc/udpspeeder2raw:latest
+
+# 使用预构建镜像部署
+docker-compose -f docker-compose.ghcr.yml up -d
+```
+
+### 手动构建镜像
+
+```bash
+# 构建本地镜像
+docker build -t udpspeeder2raw .
+
+# 构建多架构镜像
+docker buildx build --platform linux/amd64,linux/arm64 -t udpspeeder2raw .
+
+# 预下载所有架构的二进制文件
+./prepare-binaries.sh
+
+# 下载特定架构的二进制文件
+./download-binaries.sh arm64
+```
+
+### 多架构支持
+
+本项目支持以下架构：
+
+- **linux/amd64**: Intel/AMD 64位处理器
+- **linux/arm64**: ARM 64位处理器 (如树莓派4、Apple M系列)
+- **linux/arm**: ARM 32位处理器 (如老版本树莓派)
+
+Docker镜像构建时会自动下载对应架构的UDPspeeder和UDP2Raw二进制文件。如果下载失败，会使用本地的fallback文件。
+
+### 二进制文件管理
+
+```bash
+# 预下载所有架构的二进制文件
+./manage.sh prepare
+
+# 下载特定架构的二进制文件
+./manage.sh download arm64
+
+# 手动下载并管理二进制文件
+./download-binaries.sh amd64    # 下载AMD64架构
+./download-binaries.sh arm64    # 下载ARM64架构
+./download-binaries.sh arm      # 下载ARM架构
+```
+
+### 发布镜像到GHCR
+
+如果您想发布自己的镜像版本：
+
+1. **生成GitHub Token**
+   - 访问 GitHub Settings > Developer settings > Personal access tokens
+   - 创建token，勾选 `write:packages` 权限
+
+2. **登录到GHCR**
+   ```bash
+   echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+   ```
+
+3. **构建并推送**
+   ```bash
+   # 使用发布脚本
+   ./publish-docker.sh v1.0.0
+   
+   # 或者手动构建推送
+   docker buildx build --platform linux/amd64,linux/arm64 \
+     --tag ghcr.io/YOUR_USERNAME/udpspeeder2raw:latest \
+     --push .
+   ```
 
 ## 技术架构
 

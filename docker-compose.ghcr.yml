@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  udpspeeder2raw-web:
+    image: ghcr.io/ccffee-jc/udpspeeder2raw:latest
+    container_name: udpspeeder2raw-web
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      # 持久化配置文件
+      - ./config.json:/app/config.json
+      # 持久化日志
+      - ./logs:/app/logs
+      # 持久化客户端输出
+      - ./client_out:/app/client_out
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Shanghai
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
