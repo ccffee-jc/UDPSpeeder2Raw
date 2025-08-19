@@ -1,0 +1,22 @@
+{
+  "name": "udpspeeder2raw-web",
+  "version": "1.0.0",
+  "description": "UDPSpeeder2Raw Web Interface",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "archiver": "^5.3.1"
+  },
+  "keywords": [
+    "udpspeeder",
+    "udp2raw",
+    "tunnel",
+    "vpn"
+  ],
+  "author": "",
+  "license": "MIT"
+}
