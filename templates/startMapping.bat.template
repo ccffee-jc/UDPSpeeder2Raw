@@ -1,34 +1,38 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo Detecting available network interfaces...
+echo Starting U2R Client...
+echo Note Direct connection UDPSpeeder to U2R to Remote Server
 echo.
 
-:: 获取网络接口信息
-for /f "tokens=1,2 delims=:" %%a in ('ipconfig ^| findstr /C:"IPv4"') do (
-    set "ip_line=%%b"
-    set "ip_line=!ip_line: =!"
-    if not "!ip_line!"=="127.0.0.1" (
-        echo Available IP: !ip_line!
-    )
+rem Check if REMOTE_HOST is a domain name and resolve it to IP
+set REMOTE_HOST={{REMOTE_HOST}}
+echo Checking remote host !REMOTE_HOST!
+
+rem Try to resolve domain name to IP using PowerShell
+for /f %%i in ('powershell -Command "[System.Net.Dns]::GetHostAddresses('!REMOTE_HOST!') | Select-Object -First 1 | ForEach-Object { $_.IPAddressToString }" 2^>nul') do (
+    set RESOLVED_IP=%%i
 )
 
-echo.
-echo Starting U2R Client...
-echo Note: Direct connection - UDPSpeeder -> U2R -> Remote Server
-echo.
+rem If we got a resolved IP use it otherwise use the original value
+if defined RESOLVED_IP (
+    echo Domain !REMOTE_HOST! resolved to IP !RESOLVED_IP!
+    set REMOTE_HOST=!RESOLVED_IP!
+) else (
+    echo Using original host value may be IP !REMOTE_HOST!
+)
 
-echo Starting U2R Client (127.0.0.1:{{UDP2RAW_PORT}} -> {{REMOTE_HOST}}:{{UDP2RAW_PORT}})...
-start "U2R Client" "%~dp0udp2raw_mp.exe" -c -l 127.0.0.1:{{UDP2RAW_PORT}} -r {{REMOTE_HOST}}:{{UDP2RAW_PORT}} --raw-mode easyfaketcp -k "{{PASSWORD}}" {{UDP2RAW_EXTRA}}
+echo Starting U2R Client from 127.0.0.1 {{UDP2RAW_PORT}} to !REMOTE_HOST! {{UDP2RAW_PORT}}
+start "U2R Client" "%~dp0udp2raw_mp.exe" -c -l 127.0.0.1:{{UDP2RAW_PORT}} -r !REMOTE_HOST!:{{UDP2RAW_PORT}} --raw-mode easyfaketcp -k "{{PASSWORD}}" {{UDP2RAW_EXTRA}}
 
 timeout /t 3 /nobreak >nul
 
 echo Starting UDPSpeeder...
 start "UDPSpeeder Client" "%~dp0speederv2.exe" -c -l 0.0.0.0:51820 -r 127.0.0.1:{{UDP2RAW_PORT}} -k {{PASSWORD}} -f{{FEC_CONFIG}} --mode {{MODE}} --timeout {{TIMEOUT}} -q {{QUEUE}} -i {{INTERVAL}}
 
-echo Services started in configuration with U2R!
-echo Architecture: WireGuard(51820) -> UDPSpeeder -> U2R Client -> U2R Server -> UDPSpeeder Server
-echo UDPSpeeder listening on: 0.0.0.0:51820 (WireGuard port)
-echo UDPSpeeder forwarding to local U2R: 127.0.0.1:{{UDP2RAW_PORT}}
-echo U2R Client: 127.0.0.1:{{UDP2RAW_PORT}} -> {{REMOTE_HOST}}:{{UDP2RAW_PORT}} (easy-faketcp)
+echo Services started in configuration with U2R
+echo Architecture WireGuard 51820 to UDPSpeeder to U2R Client to U2R Server to UDPSpeeder Server
+echo UDPSpeeder listening on 0.0.0.0 port 51820 WireGuard port
+echo UDPSpeeder forwarding to local U2R 127.0.0.1 port {{UDP2RAW_PORT}}
+echo U2R Client from 127.0.0.1 port {{UDP2RAW_PORT}} to !REMOTE_HOST! port {{UDP2RAW_PORT}} easy-faketcp
 pause
